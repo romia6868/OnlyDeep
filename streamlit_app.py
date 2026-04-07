@@ -468,38 +468,70 @@ def generate_class_image():
                     i += 1
     return np.array(bg_pil.convert("RGB")), present
 
-def extract_faces(image, confidence_threshold=0.7):
-    img_rgb = np.array(image.convert("RGB"))    
-    if isinstance(img_rgb, tuple):
-        img_rgb = img_rgb[0]
+def extract_faces(image, confidence_threshold=0.5):
+    # המרה בטוחה לתמונה
+    img_rgb = np.array(image.convert("RGB"), dtype=np.uint8)
+
     faces = []
+
     try:
+        # ניסיון ראשון עם retinaface
         face_objs = DeepFace.extract_faces(
             img_path=img_rgb,
             detector_backend="retinaface",
             enforce_detection=False,
             align=True
         )
-        for face_obj in face_objs:
-            if face_obj["confidence"] < confidence_threshold:
+
+        # אם חזר משהו מוזר (tuple) או ריק → fallback
+        if isinstance(face_objs, tuple) or len(face_objs) == 0:
+            raise Exception("RetinaFace failed")
+
+    except Exception as e:
+        # fallback ל-opencv (הרבה יותר יציב)
+        try:
+            face_objs = DeepFace.extract_faces(
+                img_path=img_rgb,
+                detector_backend="opencv",
+                enforce_detection=False
+            )
+        except Exception as e2:
+            st.warning(f"Face detection error: {e2}")
+            return [], img_rgb
+
+    # עיבוד הפנים
+    for face_obj in face_objs:
+        try:
+            if face_obj.get("confidence", 1) < confidence_threshold:
                 continue
+
             region = face_obj["facial_area"]
             x, y, w, h = region["x"], region["y"], region["w"], region["h"]
+
             pad_x = int(0.2 * w)
             pad_y = int(0.2 * h)
+
             x1 = max(0, x - pad_x)
             y1 = max(0, y - pad_y)
             x2 = min(img_rgb.shape[1], x + w + pad_x)
             y2 = min(img_rgb.shape[0], y + h + pad_y)
-            face = img_rgb[y1:y2, x1:x2]
-            if face.size == 0:
-                continue
-            face_img = Image.fromarray(face).resize((160, 160))
-            faces.append({"face": face_img, "box": (x1, y1, x2-x1, y2-y1)})
-    except Exception as e:
-        st.warning(f"Face detection error: {e}")
-    return faces, img_rgb
 
+            face = img_rgb[y1:y2, x1:x2]
+
+            if face is None or face.size == 0:
+                continue
+
+            face_img = Image.fromarray(face).resize((160, 160))
+
+            faces.append({
+                "face": face_img,
+                "box": (x1, y1, x2 - x1, y2 - y1)
+            })
+
+        except Exception:
+            continue
+
+    return faces, img_rgb
 def cosine_distance(a, b):
     return 1 - np.dot(a, b)
 
