@@ -469,7 +469,9 @@ def generate_class_image():
     return np.array(bg_pil.convert("RGB")), present
 
 def extract_faces(image, confidence_threshold=0.7):
-    img_rgb = np.array(image.convert("RGB"))
+    img_rgb = np.array(image.convert("RGB"))    
+    if isinstance(img_rgb, tuple):
+        img_rgb = img_rgb[0]
     faces = []
     try:
         face_objs = DeepFace.extract_faces(
