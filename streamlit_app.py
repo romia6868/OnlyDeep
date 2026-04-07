@@ -568,10 +568,12 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
             font_name = ImageFont.truetype(path, 32)
             font_conf = ImageFont.truetype(path, 20)
             break
-    if not font_name:
-        font_name = ImageFont.load_default(size=32)
-        font_conf = ImageFont.load_default(size=20)
-
+        try:
+            font_name = ImageFont.truetype("DejaVuSans-Bold.ttf", 32)
+            font_conf = ImageFont.truetype("DejaVuSans-Bold.ttf", 20)
+        except:
+            font_name = ImageFont.load_default()
+            font_conf = ImageFont.load_default()
     for face in recognized_faces:
         x, y, w, h = face["box"]
         if face["unknown"]:
