@@ -532,7 +532,7 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
             result = DeepFace.represent(
                 img_path=np.array(img),
                 model_name="Facenet512",
-                detector_backend="skip",
+               detector_backend="opencv",
                 enforce_detection=False
             )
             emb = np.array(result[0]["embedding"])
