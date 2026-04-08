@@ -474,13 +474,18 @@ def extract_faces(image, confidence_threshold=0.7):
     img_rgb = np.array(image.convert("RGB"))
     st.write(f"DEBUG img_rgb type: {type(img_rgb)}, shape: {img_rgb.shape}")
     faces = []
-    try:
-        face_objs = DeepFace.extract_faces(
-            img_path=img_rgb,
-            detector_backend="retinaface",
-            enforce_detection=False,
-            align=True
-        )
+     try:
+            face_objs = DeepFace.extract_faces(
+                img_path=img_rgb,
+                detector_backend="retinaface",
+                enforce_detection=False,
+                align=True
+            )
+        st.write(f"DEBUG face_objs type: {type(face_objs)}")
+        st.write(f"DEBUG face_objs length: {len(face_objs)}")
+        if len(face_objs) > 0:
+            st.write(f"DEBUG first item type: {type(face_objs[0])}")
+            st.write(f"DEBUG first item keys: {face_objs[0].keys() if isinstance(face_objs[0], dict) else 'not a dict'}")
         if isinstance(face_objs, tuple):
             face_objs = list(face_objs)
         for face_obj in face_objs:
