@@ -469,6 +469,10 @@ def generate_class_image():
     return np.array(bg_pil.convert("RGB")), present
 
 def extract_faces(image, confidence_threshold=0.7):
+    import deepface
+    st.write(f"DEBUG deepface version: {deepface.__version__}")
+    st.write(f"DEBUG image type: {type(image)}")
+    
     img_rgb = np.array(image.convert("RGB"))
     faces = []
     try:
