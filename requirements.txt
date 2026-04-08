@@ -8,3 +8,4 @@ rembg==2.0.50
 protobuf==3.20.3
 openpyxl
 pandas
+retina-face==0.0.17
