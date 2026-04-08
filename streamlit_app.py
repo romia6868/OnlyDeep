@@ -257,6 +257,8 @@ if "student_roster" not in st.session_state:
 
 STUDENT_ROSTER = st.session_state.student_roster
 
+st.cache_resource.clear()
+reference_embeddings = load_reference_embeddings()
 @st.cache_resource
 def load_reference_embeddings():
     embeddings = {}
@@ -589,13 +591,12 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
             continue
 
        avg_distances = {}
-       for name, ref_embs in reference_embeddings.items():
+        for name, ref_embs in reference_embeddings.items():
             avg_distances[name] = min([cosine_distance(emb, r) for r in ref_embs])
 
-# ✅ בדיקה שיש בכלל עם מי להשוות
         if not avg_distances:
-                st.warning("No reference embeddings loaded! Check REFERENCE_DIR.")
-                break
+            st.error("Reference embeddings are empty! Cannot identify faces.")
+            return  # ← עוצר את הפונקציה בלי לקרוס
 
         best_name, best_dist = min(avg_distances.items(), key=lambda x: x[1])
         if best_dist > threshold:
