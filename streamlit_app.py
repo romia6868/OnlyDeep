@@ -272,34 +272,39 @@ def load_reference_embeddings():
 
         for file in files:
             img_path = os.path.join(student_path, file)
+
             try:
+                # 🔥 שימוש ב-path (הכי יציב)
                 result = DeepFace.represent(
                     img_path=img_path,
                     model_name="Facenet512",
-                    detector_backend="retinaface",
+                    detector_backend="opencv",  # 🔥 התיקון הקריטי
                     enforce_detection=False
                 )
-            
+
+                # 🔹 DeepFace לפעמים מחזיר tuple
                 if isinstance(result, tuple):
                     result = result[0]
-            
+
                 if not isinstance(result, list) or len(result) == 0:
+                    st.warning(f"No embedding for {student} - {file}")
                     continue
-            
+
                 emb = result[0].get("embedding")
-            
+
                 if emb is None:
                     continue
-            
+
                 emb = np.array(emb)
-            
+
                 if emb.size == 0:
                     continue
-            
+
+                # 🔹 נרמול
                 emb = emb / np.linalg.norm(emb)
-            
+
                 student_embeddings.append(emb)
-            
+
             except Exception as e:
                 st.warning(f"Failed on {student}/{file}: {e}")
 
@@ -309,13 +314,11 @@ def load_reference_embeddings():
             st.warning(f"No valid embeddings for {student}")
 
     if not embeddings:
-        st.error("❌ ZERO embeddings loaded — check your dataset/images!")
-
+        st.error("❌ ZERO embeddings loaded — check your images!")
     else:
         st.success(f"✅ Loaded embeddings for {len(embeddings)} students")
 
     return embeddings
-
 @st.cache_resource
 def load_reference_photos():
     photos = {}
