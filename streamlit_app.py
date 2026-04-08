@@ -242,27 +242,83 @@ STUDENT_ROSTER = st.session_state.student_roster
 @st.cache_resource
 def load_reference_embeddings():
     embeddings = {}
-    for student in os.listdir(REFERENCE_DIR):
+
+    if not os.path.exists(REFERENCE_DIR):
+        st.error(f"REFERENCE_DIR not found: {REFERENCE_DIR}")
+        return embeddings
+
+    students = os.listdir(REFERENCE_DIR)
+
+    if not students:
+        st.error("No student folders found!")
+        return embeddings
+
+    for student in students:
         student_path = os.path.join(REFERENCE_DIR, student)
-        if os.path.isdir(student_path):
-            student_embeddings = []
-            for file in os.listdir(student_path):
-                if file.lower().endswith((".jpg", ".jpeg", ".png", ".jfif")):
-                    img_path = os.path.join(student_path, file)
-                    try:
-                        result = DeepFace.represent(
-                            img_path=img_path,
-                            model_name="Facenet512",
-                            detector_backend="retinaface",
-                            enforce_detection=False
-                        )
-                        emb = np.array(result[0]["embedding"])
-                        emb = emb / np.linalg.norm(emb)
-                        student_embeddings.append(emb)
-                    except Exception:
-                        pass
-            if student_embeddings:
-                embeddings[student] = student_embeddings
+
+        if not os.path.isdir(student_path):
+            continue
+
+        student_embeddings = []
+
+        files = [
+            f for f in os.listdir(student_path)
+            if f.lower().endswith((".jpg", ".jpeg", ".png", ".jfif"))
+        ]
+
+        if not files:
+            st.warning(f"No images for {student}")
+            continue
+
+        for file in files:
+            img_path = os.path.join(student_path, file)
+
+            try:
+                img = Image.open(img_path).convert("RGB")
+                img_np = np.array(img)
+
+                result = DeepFace.represent(
+                    img_path=img_np,  # 🔥 FIX קריטי
+                    model_name="Facenet512",
+                    detector_backend="retinaface",
+                    enforce_detection=False
+                )
+
+                if isinstance(result, tuple):
+                    result = result[0]
+
+                if not isinstance(result, list) or len(result) == 0:
+                    st.warning(f"No embedding for {student} - {file}")
+                    continue
+
+                emb = result[0].get("embedding")
+
+                if emb is None:
+                    continue
+
+                emb = np.array(emb)
+
+                if emb.size == 0:
+                    continue
+
+                emb = emb / np.linalg.norm(emb)
+
+                student_embeddings.append(emb)
+
+            except Exception as e:
+                st.warning(f"Failed on {student}/{file}: {e}")
+
+        if student_embeddings:
+            embeddings[student] = student_embeddings
+        else:
+            st.warning(f"No valid embeddings for {student}")
+
+    if not embeddings:
+        st.error("❌ ZERO embeddings loaded — check your dataset/images!")
+
+    else:
+        st.success(f"✅ Loaded embeddings for {len(embeddings)} students")
+
     return embeddings
 
 @st.cache_resource
