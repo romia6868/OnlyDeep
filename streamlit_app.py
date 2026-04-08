@@ -656,7 +656,7 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
             result = DeepFace.represent(
                 img_path=img_np,
                 model_name="Facenet512",
-                detector_backend="retinaface",
+                detector_backend="skip",
                 enforce_detection=False
             )
 
