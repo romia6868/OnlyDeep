@@ -473,7 +473,6 @@ def extract_faces(image, confidence_threshold=0.7):
             enforce_detection=False,
             align=True
         )
-        )
         # ✅ טיפול במקרה שהתוצאה היא tuple במקום list
         if isinstance(face_objs, tuple):
             face_objs = list(face_objs)
