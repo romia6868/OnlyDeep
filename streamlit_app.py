@@ -454,48 +454,87 @@ def generate_class_image():
     return np.array(bg_pil.convert("RGB")), present
 
 def extract_faces(image, confidence_threshold=0.7):
+    """
+    Extract faces from an image using DeepFace with robust error handling.
+    """
+
+    # 🔹 הגנה: אם הגיע tuple
     if isinstance(image, tuple):
         image = image[0]
-    img_rgb = np.array(image.convert("RGB"))
+
+    # 🔹 ודא שזה PIL Image
+    if not isinstance(image, Image.Image):
+        raise ValueError(f"Expected PIL.Image, got {type(image)}")
+
     faces = []
+
     try:
-        # ✅ הוסיפי כאן:
-        st.write(f"DEBUG before deepface: type={type(img_rgb)}, is_tuple={isinstance(img_rgb, tuple)}")
-        if isinstance(img_rgb, tuple):
-            st.write(f"DEBUG tuple length: {len(img_rgb)}, first element type: {type(img_rgb[0])}")
-            img_rgb = img_rgb[0]
-        img_rgb = np.array(img_rgb, dtype=np.uint8)
-        st.write(f"DEBUG after fix: type={type(img_rgb)}, shape={img_rgb.shape}")
-        
+        # 🔥 שימוש ישיר ב-PIL (יותר יציב מ-numpy)
         face_objs = DeepFace.extract_faces(
-            img_path=img_rgb,
+            img_path=image,
             detector_backend="retinaface",
             enforce_detection=False,
             align=True
         )
-        # ✅ טיפול במקרה שהתוצאה היא tuple במקום list
+
+        # 🔥 DeepFace לפעמים מחזיר tuple
         if isinstance(face_objs, tuple):
-            face_objs = list(face_objs)
+            face_objs = face_objs[0]
+
+        # 🔥 אם זה לא list → ננקה
+        if not isinstance(face_objs, list):
+            face_objs = []
+
+        # נמיר פעם אחת ל-numpy (רק לחיתוך)
+        img_rgb = np.array(image.convert("RGB"), dtype=np.uint8)
+
         for face_obj in face_objs:
+            if not isinstance(face_obj, dict):
+                continue
+
+            # 🔹 סינון לפי confidence
             if face_obj.get("confidence", 1) < confidence_threshold:
                 continue
-            region = face_obj["facial_area"]
-            x, y, w, h = region["x"], region["y"], region["w"], region["h"]
+
+            region = face_obj.get("facial_area")
+            if not region:
+                continue
+
+            x = region.get("x", 0)
+            y = region.get("y", 0)
+            w = region.get("w", 0)
+            h = region.get("h", 0)
+
+            if w <= 0 or h <= 0:
+                continue
+
+            # 🔹 padding (לשפר זיהוי)
             pad_x = int(0.2 * w)
             pad_y = int(0.2 * h)
+
             x1 = max(0, x - pad_x)
             y1 = max(0, y - pad_y)
             x2 = min(img_rgb.shape[1], x + w + pad_x)
             y2 = min(img_rgb.shape[0], y + h + pad_y)
+
             face = img_rgb[y1:y2, x1:x2]
+
             if face.size == 0:
                 continue
+
+            # 🔹 המרה חזרה ל-PIL ל-DeepFace בהמשך
             face_img = Image.fromarray(face).resize((160, 160))
-            faces.append({"face": face_img, "box": (x1, y1, x2-x1, y2-y1)})
+
+            faces.append({
+                "face": face_img,
+                "box": (x1, y1, x2 - x1, y2 - y1)
+            })
+
     except Exception as e:
         st.warning(f"Face detection error: {e}")
-    return faces, img_rgb
+        return [], None
 
+    return faces, img_rgb
 
 def cosine_distance(a, b):
     return 1 - np.dot(a, b)
