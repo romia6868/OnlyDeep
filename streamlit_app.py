@@ -453,19 +453,26 @@ def generate_class_image():
                     i += 1
     return np.array(bg_pil.convert("RGB")), present
 
-
 def extract_faces(image, confidence_threshold=0.7):
-    # ✅ טיפול במקרה שמגיע tuple
     if isinstance(image, tuple):
         image = image[0]
     img_rgb = np.array(image.convert("RGB"))
     faces = []
     try:
+        # ✅ הוסיפי כאן:
+        st.write(f"DEBUG before deepface: type={type(img_rgb)}, is_tuple={isinstance(img_rgb, tuple)}")
+        if isinstance(img_rgb, tuple):
+            st.write(f"DEBUG tuple length: {len(img_rgb)}, first element type: {type(img_rgb[0])}")
+            img_rgb = img_rgb[0]
+        img_rgb = np.array(img_rgb, dtype=np.uint8)
+        st.write(f"DEBUG after fix: type={type(img_rgb)}, shape={img_rgb.shape}")
+        
         face_objs = DeepFace.extract_faces(
             img_path=img_rgb,
             detector_backend="retinaface",
             enforce_detection=False,
             align=True
+        )
         )
         # ✅ טיפול במקרה שהתוצאה היא tuple במקום list
         if isinstance(face_objs, tuple):
