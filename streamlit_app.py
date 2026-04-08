@@ -260,18 +260,11 @@ STUDENT_ROSTER = st.session_state.student_roster
 @st.cache_resource
 def load_reference_embeddings():
     embeddings = {}
-    if not os.path.exists(REFERENCE_DIR):
-        st.error(f"REFERENCE_DIR not found: {REFERENCE_DIR}")
-        return embeddings
-    students = os.listdir(REFERENCE_DIR)
-    st.write(f"DEBUG: Found students folders: {students}")
-    for student in students:
+    for student in os.listdir(REFERENCE_DIR):
         student_path = os.path.join(REFERENCE_DIR, student)
         if os.path.isdir(student_path):
             student_embeddings = []
-            files = os.listdir(student_path)
-            st.write(f"DEBUG: {student} has {len(files)} files")
-            for file in files:
+            for file in os.listdir(student_path):
                 if file.lower().endswith((".jpg",".jpeg",".png",".jfif")):
                     img_path = os.path.join(student_path, file)
                     try:
@@ -284,13 +277,10 @@ def load_reference_embeddings():
                         emb = np.array(result[0]["embedding"])
                         emb = emb / np.linalg.norm(emb)
                         student_embeddings.append(emb)
-                    except Exception as e:
-                        st.write(f"DEBUG: Failed on {student}/{file}: {e}")
+                    except:
+                        pass
             if student_embeddings:
                 embeddings[student] = student_embeddings
-                st.write(f"DEBUG: ✓ {student} loaded with {len(student_embeddings)} embeddings")
-            else:
-                st.write(f"DEBUG: ✗ {student} - no embeddings loaded!")
     return embeddings
 
 @st.cache_resource
@@ -305,9 +295,6 @@ def load_reference_photos():
                 img_path = os.path.join(student_path, files[0])
                 photos[student] = Image.open(img_path).convert("RGB")
     return photos
-
-reference_embeddings = load_reference_embeddings()
-reference_photos = load_reference_photos()
 
 reference_embeddings = load_reference_embeddings()
 reference_photos = load_reference_photos()
@@ -481,70 +468,36 @@ def generate_class_image():
                     i += 1
     return np.array(bg_pil.convert("RGB")), present
 
-def extract_faces(image, confidence_threshold=0.5):
-    # המרה בטוחה לתמונה
-    img_rgb = np.array(image.convert("RGB"), dtype=np.uint8)
-
+def extract_faces(image, confidence_threshold=0.7):
+    img_rgb = np.array(image.convert("RGB"))
     faces = []
-
     try:
-        # ניסיון ראשון עם retinaface
         face_objs = DeepFace.extract_faces(
             img_path=img_rgb,
             detector_backend="retinaface",
             enforce_detection=False,
             align=True
         )
-
-        # אם חזר משהו מוזר (tuple) או ריק → fallback
-        if isinstance(face_objs, tuple) or len(face_objs) == 0:
-            raise Exception("RetinaFace failed")
-
-    except Exception as e:
-        # fallback ל-opencv (הרבה יותר יציב)
-        try:
-            face_objs = DeepFace.extract_faces(
-                img_path=img_rgb,
-                detector_backend="opencv",
-                enforce_detection=False
-            )
-        except Exception as e2:
-            st.warning(f"Face detection error: {e2}")
-            return [], img_rgb
-
-    # עיבוד הפנים
-    for face_obj in face_objs:
-        try:
-            if face_obj.get("confidence", 1) < confidence_threshold:
+        for face_obj in face_objs:
+            if face_obj["confidence"] < confidence_threshold:
                 continue
-
             region = face_obj["facial_area"]
             x, y, w, h = region["x"], region["y"], region["w"], region["h"]
-
             pad_x = int(0.2 * w)
             pad_y = int(0.2 * h)
-
             x1 = max(0, x - pad_x)
             y1 = max(0, y - pad_y)
             x2 = min(img_rgb.shape[1], x + w + pad_x)
             y2 = min(img_rgb.shape[0], y + h + pad_y)
-
             face = img_rgb[y1:y2, x1:x2]
-
-            if face is None or face.size == 0:
+            if face.size == 0:
                 continue
-
             face_img = Image.fromarray(face).resize((160, 160))
-
-            faces.append({
-                "face": face_img,
-                "box": (x1, y1, x2 - x1, y2 - y1)
-            })
-
-        except Exception:
-            continue
-
+            faces.append({"face": face_img, "box": (x1, y1, x2-x1, y2-y1)})
+    except Exception as e:
+        st.warning(f"Face detection error: {e}")
     return faces, img_rgb
+
 def cosine_distance(a, b):
     return 1 - np.dot(a, b)
 
@@ -577,7 +530,7 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
             result = DeepFace.represent(
                 img_path=np.array(img),
                 model_name="Facenet512",
-                detector_backend="retinaface",
+                detector_backend="skip",
                 enforce_detection=False
             )
             emb = np.array(result[0]["embedding"])
@@ -588,10 +541,6 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
         avg_distances = {}
         for name, ref_embs in reference_embeddings.items():
             avg_distances[name] = min([cosine_distance(emb, r) for r in ref_embs])
-
-        if not avg_distances:
-            st.error("Reference embeddings are empty!")
-            return
 
         best_name, best_dist = min(avg_distances.items(), key=lambda x: x[1])
         if best_dist > threshold:
@@ -640,6 +589,7 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
     missing = [s for s in STUDENT_ROSTER if s not in known_present]
     attendance_pct = int(len(known_present) / max(len(STUDENT_ROSTER), 1) * 100)
     date_str = datetime.now().strftime("%Y-%m-%d %H:%M")
+
     updated_absences = update_absences(missing)
 
     st.session_state.last_results = {
@@ -699,7 +649,6 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
         """, unsafe_allow_html=True)
 
     st.markdown('<div class="section-divider"><div class="divider-line"></div><span class="divider-badge badge-present"><span class="material-symbols-outlined">how_to_reg</span>Present</span><div class="divider-line"></div></div>', unsafe_allow_html=True)
-
     if present_students:
         cols = st.columns(5)
         for i, (name, data) in enumerate(present_students.items()):
@@ -714,7 +663,6 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
                     st.markdown(f'<div style="text-align:center;color:#7a9e6a;font-weight:600;font-size:13px;">{name}</div></div>', unsafe_allow_html=True)
 
     st.markdown('<div class="section-divider"><div class="divider-line"></div><span class="divider-badge badge-absent"><span class="material-symbols-outlined">person_off</span>Absent</span><div class="divider-line"></div></div>', unsafe_allow_html=True)
-
     if missing:
         cols = st.columns(5)
         for i, name in enumerate(missing):
