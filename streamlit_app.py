@@ -557,7 +557,7 @@ def cosine_distance(a, b):
     return 1 - np.dot(a, b)
 
 def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
-    # הגנה: אם הגיע tuple
+    # 🔹 הגנה: tuple → PIL
     if isinstance(image_pil, tuple):
         image_pil = image_pil[0]
 
@@ -578,10 +578,16 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
 
     progress = st.progress(0, text="Detecting faces...")
 
+    # 🔹 קריאה לפונקציה שלך
     faces, original_img_rgb = extract_faces(image_pil, confidence_threshold)
 
     progress.progress(30, text="Analyzing faces...")
     scan_placeholder.empty()
+
+    # 🔴 הגנה קריטית
+    if original_img_rgb is None:
+        st.error("Image processing failed")
+        return
 
     present_students = {}
     recognized_faces = []
@@ -591,36 +597,36 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
         img = data["face"]
         box = data["box"]
 
-        # הגנה: אם הגיע tuple
         if isinstance(img, tuple):
             img = img[0]
 
         if not isinstance(img, Image.Image):
-            st.write(f"Skipping invalid face type: {type(img)}")
             continue
 
-        progress.progress(30 + int(60 * i / total),
-                          text=f"Identifying face {i+1} of {len(faces)}...")
+        progress.progress(
+            30 + int(60 * i / total),
+            text=f"Identifying face {i+1} of {len(faces)}..."
+        )
 
         try:
+            # 🔥 המרה ל-numpy (הפתרון ל-startswith error)
+            img_np = np.array(img)
+
             result = DeepFace.represent(
-                img_path=img,  # ✅ חשוב מאוד - לא numpy
+                img_path=img_np,
                 model_name="Facenet512",
                 detector_backend="retinaface",
                 enforce_detection=False
             )
 
-            # 🔥 הגנה: DeepFace מחזיר לפעמים tuple
+            # 🔹 DeepFace לפעמים מחזיר tuple
             if isinstance(result, tuple):
                 result = result[0]
 
-            # 🔥 הגנה: לפעמים זה לא list
             if not isinstance(result, list) or len(result) == 0:
-                st.write("Invalid represent result:", result)
                 continue
 
             if "embedding" not in result[0]:
-                st.write("Missing embedding:", result)
                 continue
 
             emb = np.array(result[0]["embedding"])
@@ -644,8 +650,8 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
                 dists = [cosine_distance(emb, r) for r in ref_embs]
                 if dists:
                     avg_distances[name] = min(dists)
-            except Exception as e:
-                st.write(f"Distance error for {name}:", e)
+            except Exception:
+                continue
 
         if not avg_distances:
             continue
@@ -665,8 +671,7 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
             })
 
         elif best_name is None:
-            unknown_key = f"Unknown_{i}"
-            present_students[unknown_key] = {"img": img, "unknown": True}
+            present_students[f"Unknown_{i}"] = {"img": img, "unknown": True}
             recognized_faces.append({
                 "name": "Unknown",
                 "box": box,
@@ -682,7 +687,7 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
         unsafe_allow_html=True
     )
 
-    # ציור תוצאות
+    # 🔴 עכשיו בטוח לא יקרוס
     img_draw = Image.fromarray(original_img_rgb)
     draw = ImageDraw.Draw(img_draw)
 
