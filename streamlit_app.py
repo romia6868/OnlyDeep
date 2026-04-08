@@ -272,39 +272,34 @@ def load_reference_embeddings():
 
         for file in files:
             img_path = os.path.join(student_path, file)
-
             try:
-                img = Image.open(img_path).convert("RGB")
-                img_np = np.array(img)
-
                 result = DeepFace.represent(
-                    img_path=img_np,  # 🔥 FIX קריטי
+                    img_path=img_path,
                     model_name="Facenet512",
                     detector_backend="retinaface",
                     enforce_detection=False
                 )
-
+            
                 if isinstance(result, tuple):
                     result = result[0]
-
+            
                 if not isinstance(result, list) or len(result) == 0:
-                    st.warning(f"No embedding for {student} - {file}")
                     continue
-
+            
                 emb = result[0].get("embedding")
-
+            
                 if emb is None:
                     continue
-
+            
                 emb = np.array(emb)
-
+            
                 if emb.size == 0:
                     continue
-
+            
                 emb = emb / np.linalg.norm(emb)
-
+            
                 student_embeddings.append(emb)
-
+            
             except Exception as e:
                 st.warning(f"Failed on {student}/{file}: {e}")
 
