@@ -3,9 +3,9 @@ numpy==1.23.5
 Pillow==9.5.0
 deepface==0.0.79
 tensorflow==2.15.0
-opencv-python-headless==4.7.0.72
+opencv-python-headless==4.8.1.78
 rembg==2.0.50
 protobuf==3.20.3
 openpyxl
 pandas
-retina-face==0.0.17
+tf-keras
