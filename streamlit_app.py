@@ -58,9 +58,7 @@ css = """
     0% { top: 0%; opacity: 1; }
     100% { top: 100%; opacity: 0.3; }
 }
-.stApp {
-    background: #f0eef4 !important;
-}
+.stApp { background: #f0eef4 !important; }
 .main-header {
     display: flex; align-items: center; gap: 14px;
     padding: 1.5rem 0 1rem;
@@ -163,52 +161,34 @@ css = """
 button_css = """
 <style>
 .stButton > button {
-    background: #ebe8f2 !important;
-    color: #4a3a6a !important;
-    border: 1.5px solid #e4dff0 !important;
-    border-radius: 10px !important;
-    padding: 11px 16px !important;
-    font-size: 14px !important;
-    font-weight: 500 !important;
-    width: 100% !important;
+    background: #ebe8f2 !important; color: #4a3a6a !important;
+    border: 1.5px solid #e4dff0 !important; border-radius: 10px !important;
+    padding: 11px 16px !important; font-size: 14px !important;
+    font-weight: 500 !important; width: 100% !important;
     transition: all 0.2s !important;
-    font-family: 'Space Grotesk', sans-serif !important;
-    margin-top: 0 !important;
+    font-family: 'Space Grotesk', sans-serif !important; margin-top: 0 !important;
 }
 .stButton > button:hover {
-    border-color: #9585b0 !important;
-    transform: translateY(-2px) !important;
+    border-color: #9585b0 !important; transform: translateY(-2px) !important;
     box-shadow: 0 4px 12px #b8a9c930 !important;
 }
 .stButton > button[kind="primary"] {
     background: linear-gradient(135deg, #b8a9c9, #9585b0) !important;
-    color: white !important;
-    border: none !important;
+    color: white !important; border: none !important;
     box-shadow: 0 4px 14px #b8a9c940 !important;
-    padding: 13px 28px !important;
-    font-size: 15px !important;
-    font-weight: 600 !important;
-    margin-top: 12px !important;
+    padding: 13px 28px !important; font-size: 15px !important;
+    font-weight: 600 !important; margin-top: 12px !important;
 }
 .stButton > button[kind="primary"]:hover {
-    filter: brightness(1.08) !important;
-    transform: translateY(-2px) !important;
+    filter: brightness(1.08) !important; transform: translateY(-2px) !important;
 }
 .stDownloadButton > button {
-    background: #ebe8f2 !important;
-    color: #9585b0 !important;
-    border: 1.5px solid #b8a9c9 !important;
-    border-radius: 10px !important;
-    font-size: 13px !important;
-    font-weight: 600 !important;
-    width: 100% !important;
-    transition: all 0.2s !important;
-    margin-top: 8px !important;
+    background: #ebe8f2 !important; color: #9585b0 !important;
+    border: 1.5px solid #b8a9c9 !important; border-radius: 10px !important;
+    font-size: 13px !important; font-weight: 600 !important;
+    width: 100% !important; transition: all 0.2s !important; margin-top: 8px !important;
 }
-.stDownloadButton > button:hover {
-    background: #e4dff0 !important;
-    transform: translateY(-1px) !important;
-}
+.stDownloadButton > button:hover { background: #e4dff0 !important; transform: translateY(-1px) !important; }
 </style>
 """
 
@@ -265,7 +245,7 @@ def load_reference_embeddings():
         if os.path.isdir(student_path):
             student_embeddings = []
             for file in os.listdir(student_path):
-                if file.lower().endswith((".jpg",".jpeg",".png",".jfif")):
+                if file.lower().endswith((".jpg", ".jpeg", ".png", ".jfif")):
                     img_path = os.path.join(student_path, file)
                     try:
                         result = DeepFace.represent(
@@ -277,7 +257,7 @@ def load_reference_embeddings():
                         emb = np.array(result[0]["embedding"])
                         emb = emb / np.linalg.norm(emb)
                         student_embeddings.append(emb)
-                    except:
+                    except Exception:
                         pass
             if student_embeddings:
                 embeddings[student] = student_embeddings
@@ -290,7 +270,7 @@ def load_reference_photos():
         student_path = os.path.join(REFERENCE_DIR, student)
         if os.path.isdir(student_path):
             files = [f for f in os.listdir(student_path)
-                     if f.lower().endswith((".jpg",".jpeg",".png",".jfif"))]
+                     if f.lower().endswith((".jpg", ".jpeg", ".png", ".jfif"))]
             if files:
                 img_path = os.path.join(student_path, files[0])
                 photos[student] = Image.open(img_path).convert("RGB")
@@ -399,11 +379,16 @@ with st.sidebar:
                     for idx in range(len(photos_collected)):
                         img_path = os.path.join(student_dir, f"{new_name}_{idx+1}.jpg")
                         try:
-                            result = DeepFace.represent(img_path=img_path, model_name="Facenet512", detector_backend="retinaface", enforce_detection=False)
+                            result = DeepFace.represent(
+                                img_path=img_path,
+                                model_name="Facenet512",
+                                detector_backend="retinaface",
+                                enforce_detection=False
+                            )
                             emb = np.array(result[0]["embedding"])
                             emb = emb / np.linalg.norm(emb)
                             new_embeddings.append(emb)
-                        except:
+                        except Exception:
                             pass
                     if new_embeddings:
                         reference_embeddings[new_name] = new_embeddings
@@ -468,7 +453,9 @@ def generate_class_image():
                     i += 1
     return np.array(bg_pil.convert("RGB")), present
 
+
 def extract_faces(image, confidence_threshold=0.7):
+    # ✅ טיפול במקרה שמגיע tuple
     if isinstance(image, tuple):
         image = image[0]
     img_rgb = np.array(image.convert("RGB"))
@@ -480,6 +467,7 @@ def extract_faces(image, confidence_threshold=0.7):
             enforce_detection=False,
             align=True
         )
+        # ✅ טיפול במקרה שהתוצאה היא tuple במקום list
         if isinstance(face_objs, tuple):
             face_objs = list(face_objs)
         for face_obj in face_objs:
@@ -502,10 +490,16 @@ def extract_faces(image, confidence_threshold=0.7):
         st.warning(f"Face detection error: {e}")
     return faces, img_rgb
 
+
 def cosine_distance(a, b):
     return 1 - np.dot(a, b)
 
+
 def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
+    # ✅ טיפול במקרה שמגיע tuple
+    if isinstance(image_pil, tuple):
+        image_pil = image_pil[0]
+
     scan_placeholder = st.empty()
     scan_placeholder.markdown("""
     <div class="scan-container">
@@ -534,17 +528,24 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
             result = DeepFace.represent(
                 img_path=np.array(img),
                 model_name="Facenet512",
-                detector_backend="skip",
+                detector_backend="retinaface",
                 enforce_detection=False
             )
             emb = np.array(result[0]["embedding"])
             emb = emb / np.linalg.norm(emb)
-        except:
+        except Exception:
             continue
+
+        if not reference_embeddings:
+            st.error("No reference embeddings loaded!")
+            return
 
         avg_distances = {}
         for name, ref_embs in reference_embeddings.items():
             avg_distances[name] = min([cosine_distance(emb, r) for r in ref_embs])
+
+        if not avg_distances:
+            continue
 
         best_name, best_dist = min(avg_distances.items(), key=lambda x: x[1])
         if best_dist > threshold:
@@ -572,9 +573,11 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
             font_name = ImageFont.truetype(path, 32)
             font_conf = ImageFont.truetype(path, 20)
             break
+    # ✅ תיקון: load_default ללא פרמטר size
     if not font_name:
-            font_name = ImageFont.load_default()
-            font_conf = ImageFont.load_default()
+        font_name = ImageFont.load_default()
+        font_conf = ImageFont.load_default()
+
     for face in recognized_faces:
         x, y, w, h = face["box"]
         if face["unknown"]:
@@ -592,7 +595,6 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
     missing = [s for s in STUDENT_ROSTER if s not in known_present]
     attendance_pct = int(len(known_present) / max(len(STUDENT_ROSTER), 1) * 100)
     date_str = datetime.now().strftime("%Y-%m-%d %H:%M")
-
     updated_absences = update_absences(missing)
 
     st.session_state.last_results = {
@@ -679,6 +681,7 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
                 st.markdown(f'<div style="text-align:center;color:{color};font-weight:600;font-size:13px;">{name} {badge}</div></div>', unsafe_allow_html=True)
     else:
         st.success("Everyone's here today!")
+
 
 # ---- Mode content ----
 if st.session_state.mode == "upload":
