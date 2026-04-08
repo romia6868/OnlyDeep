@@ -6,7 +6,9 @@ import os
 import zipfile
 import random
 import cv2
-from rembg import remove
+def remove_background(img):
+    from rembg import remove
+    return remove(img)
 import json
 from datetime import datetime
 import pandas as pd
@@ -417,82 +419,113 @@ def generate_class_image():
         os.path.join(BASE_DIR, "images.jfif"),
         os.path.join(BASE_DIR, "images (2).jfif"),
     ]
+
     available_backgrounds = [b for b in background_options if os.path.exists(b)]
     if not available_backgrounds:
         st.error("No background images found")
         st.stop()
+
     bg = cv2.imread(random.choice(available_backgrounds))
     if bg is None:
         st.error("Could not load background")
         st.stop()
+
     bg = cv2.resize(bg, (900, 600), interpolation=cv2.INTER_CUBIC)
-    students = os.listdir(REFERENCE_DIR)
+
+    students = [
+        s for s in os.listdir(REFERENCE_DIR)
+        if os.path.isdir(os.path.join(REFERENCE_DIR, s))
+    ]
+
+    if not students:
+        st.error("No students found")
+        st.stop()
+
     present = random.sample(students, random.randint(0, len(students)))
+
     rows, cols = 2, 5
     cell_w = bg.shape[1] // cols
     cell_h = bg.shape[0] // rows
+
     positions = [(c * cell_w, r * cell_h) for r in range(rows) for c in range(cols)]
     random.shuffle(positions)
+
     bg_pil = Image.fromarray(cv2.cvtColor(bg, cv2.COLOR_BGR2RGB)).convert("RGBA")
+
     i = 0
     for name in present:
-        if i < len(positions):
-            student_dir = os.path.join(REFERENCE_DIR, name)
-            imgs = os.listdir(student_dir)
-            if imgs:
-                face = cv2.imread(os.path.join(student_dir, random.choice(imgs)))
-                if face is not None:
-                    new_w = int(cell_w * 0.8)
-                    new_h = int(cell_h * 0.8)
-                    face_pil = Image.fromarray(cv2.cvtColor(face, cv2.COLOR_BGR2RGB))
-                    face_no_bg = remove(face_pil).resize((new_w, new_h))
-                    x, y = positions[i]
-                    x += (cell_w - new_w) // 2
-                    y += (cell_h - new_h) // 2
-                    bg_pil.paste(face_no_bg, (x, y), face_no_bg)
-                    i += 1
+        if i >= len(positions):
+            break
+
+        student_dir = os.path.join(REFERENCE_DIR, name)
+        if not os.path.isdir(student_dir):
+            continue
+
+        imgs = [
+            f for f in os.listdir(student_dir)
+            if f.lower().endswith((".jpg", ".jpeg", ".png"))
+        ]
+
+        if not imgs:
+            continue
+
+        img_path = os.path.join(student_dir, random.choice(imgs))
+        face = cv2.imread(img_path)
+
+        if face is None:
+            continue
+
+        new_w = int(cell_w * 0.8)
+        new_h = int(cell_h * 0.8)
+
+        face_pil = Image.fromarray(cv2.cvtColor(face, cv2.COLOR_BGR2RGB))
+
+        # 🔥 סגמנטציה עם הגנה
+        try:
+            from rembg import remove
+            face_no_bg = remove(face_pil).resize((new_w, new_h))
+        except Exception as e:
+            st.write(f"Segmentation failed for {name}: {e}")
+            face_no_bg = face_pil.resize((new_w, new_h))
+
+        x, y = positions[i]
+        x += (cell_w - new_w) // 2
+        y += (cell_h - new_h) // 2
+
+        bg_pil.paste(face_no_bg, (x, y), face_no_bg)
+        i += 1
+
     return np.array(bg_pil.convert("RGB")), present
 
 def extract_faces(image, confidence_threshold=0.7):
-    """
-    Extract faces from an image using DeepFace with robust error handling.
-    """
-
-    # 🔹 הגנה: אם הגיע tuple
     if isinstance(image, tuple):
         image = image[0]
 
-    # 🔹 ודא שזה PIL Image
     if not isinstance(image, Image.Image):
         raise ValueError(f"Expected PIL.Image, got {type(image)}")
 
     faces = []
 
     try:
-        # 🔥 שימוש ישיר ב-PIL (יותר יציב מ-numpy)
         face_objs = DeepFace.extract_faces(
             img_path=image,
-            detector_backend="retinaface",
+            detector_backend="opencv",  # 🔥 יותר יציב מ-retinaface
             enforce_detection=False,
-            align=True
+            align=False
         )
 
-        # 🔥 DeepFace לפעמים מחזיר tuple
         if isinstance(face_objs, tuple):
             face_objs = face_objs[0]
 
-        # 🔥 אם זה לא list → ננקה
         if not isinstance(face_objs, list):
             face_objs = []
 
-        # נמיר פעם אחת ל-numpy (רק לחיתוך)
         img_rgb = np.array(image.convert("RGB"), dtype=np.uint8)
 
         for face_obj in face_objs:
             if not isinstance(face_obj, dict):
                 continue
 
-            # 🔹 סינון לפי confidence
             if face_obj.get("confidence", 1) < confidence_threshold:
                 continue
 
@@ -508,7 +541,6 @@ def extract_faces(image, confidence_threshold=0.7):
             if w <= 0 or h <= 0:
                 continue
 
-            # 🔹 padding (לשפר זיהוי)
             pad_x = int(0.2 * w)
             pad_y = int(0.2 * h)
 
@@ -522,7 +554,6 @@ def extract_faces(image, confidence_threshold=0.7):
             if face.size == 0:
                 continue
 
-            # 🔹 המרה חזרה ל-PIL ל-DeepFace בהמשך
             face_img = Image.fromarray(face).resize((160, 160))
 
             faces.append({
