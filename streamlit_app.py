@@ -506,10 +506,13 @@ def extract_faces(image, confidence_threshold=0.7):
 
     faces = []
 
+    # 🔥 המרה פעם אחת בלבד
+    img_rgb = np.array(image.convert("RGB"), dtype=np.uint8)
+
     try:
         face_objs = DeepFace.extract_faces(
-            img_path=image,
-            detector_backend="opencv",  # 🔥 יותר יציב מ-retinaface
+            img_path=img_rgb,  # ✅ FIX
+            detector_backend="opencv",
             enforce_detection=False,
             align=False
         )
@@ -519,8 +522,6 @@ def extract_faces(image, confidence_threshold=0.7):
 
         if not isinstance(face_objs, list):
             face_objs = []
-
-        img_rgb = np.array(image.convert("RGB"), dtype=np.uint8)
 
         for face_obj in face_objs:
             if not isinstance(face_obj, dict):
@@ -533,23 +534,9 @@ def extract_faces(image, confidence_threshold=0.7):
             if not region:
                 continue
 
-            x = region.get("x", 0)
-            y = region.get("y", 0)
-            w = region.get("w", 0)
-            h = region.get("h", 0)
+            x, y, w, h = region["x"], region["y"], region["w"], region["h"]
 
-            if w <= 0 or h <= 0:
-                continue
-
-            pad_x = int(0.2 * w)
-            pad_y = int(0.2 * h)
-
-            x1 = max(0, x - pad_x)
-            y1 = max(0, y - pad_y)
-            x2 = min(img_rgb.shape[1], x + w + pad_x)
-            y2 = min(img_rgb.shape[0], y + h + pad_y)
-
-            face = img_rgb[y1:y2, x1:x2]
+            face = img_rgb[y:y+h, x:x+w]
 
             if face.size == 0:
                 continue
@@ -558,14 +545,13 @@ def extract_faces(image, confidence_threshold=0.7):
 
             faces.append({
                 "face": face_img,
-                "box": (x1, y1, x2 - x1, y2 - y1)
+                "box": (x, y, w, h)
             })
 
     except Exception as e:
         st.warning(f"Face detection error: {e}")
-        return [], None
 
-    return faces, img_rgb
+    return faces, img_rgb  # ✅ תמיד מחזיר תמונה
 
 def cosine_distance(a, b):
     return 1 - np.dot(a, b)
