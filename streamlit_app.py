@@ -271,7 +271,7 @@ def load_reference_embeddings():
                         result = DeepFace.represent(
                             img_path=img_path,
                             model_name="Facenet512",
-                            detector_backend="opencv",
+                            detector_backend="retinaface",
                             enforce_detection=False
                         )
                         emb = np.array(result[0]["embedding"])
