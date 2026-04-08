@@ -469,12 +469,9 @@ def generate_class_image():
     return np.array(bg_pil.convert("RGB")), present
 
 def extract_faces(image, confidence_threshold=0.7):
-    import deepface
-    st.write(f"DEBUG deepface location: {deepface.__file__}")
-    st.write(f"DEBUG image type: {type(image)}")
-    
+    if isinstance(image, tuple):
+        image = image[0]
     img_rgb = np.array(image.convert("RGB"))
-    ...
     faces = []
     try:
         face_objs = DeepFace.extract_faces(
@@ -483,8 +480,10 @@ def extract_faces(image, confidence_threshold=0.7):
             enforce_detection=False,
             align=True
         )
+        if isinstance(face_objs, tuple):
+            face_objs = list(face_objs)
         for face_obj in face_objs:
-            if face_obj["confidence"] < confidence_threshold:
+            if face_obj.get("confidence", 1) < confidence_threshold:
                 continue
             region = face_obj["facial_area"]
             x, y, w, h = region["x"], region["y"], region["w"], region["h"]
@@ -574,9 +573,8 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
             font_conf = ImageFont.truetype(path, 20)
             break
     if not font_name:
-        font_name = ImageFont.load_default(size=32)
-        font_conf = ImageFont.load_default(size=20)
-
+            font_name = ImageFont.load_default()
+            font_conf = ImageFont.load_default()
     for face in recognized_faces:
         x, y, w, h = face["box"]
         if face["unknown"]:
