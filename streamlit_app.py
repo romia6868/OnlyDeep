@@ -500,11 +500,14 @@ def extract_faces(image, confidence_threshold=0.7):
 def cosine_distance(a, b):
     return 1 - np.dot(a, b)
 
-
 def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
-    # ✅ טיפול במקרה שמגיע tuple
+    # הגנה: אם הגיע tuple
     if isinstance(image_pil, tuple):
         image_pil = image_pil[0]
+
+    if not isinstance(image_pil, Image.Image):
+        st.error(f"Invalid image type: {type(image_pil)}")
+        return
 
     scan_placeholder = st.empty()
     scan_placeholder.markdown("""
@@ -518,7 +521,9 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
     """, unsafe_allow_html=True)
 
     progress = st.progress(0, text="Detecting faces...")
+
     faces, original_img_rgb = extract_faces(image_pil, confidence_threshold)
+
     progress.progress(30, text="Analyzing faces...")
     scan_placeholder.empty()
 
@@ -529,17 +534,48 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
     for i, data in enumerate(faces):
         img = data["face"]
         box = data["box"]
-        progress.progress(30 + int(60 * i / total), text=f"Identifying face {i+1} of {len(faces)}...")
+
+        # הגנה: אם הגיע tuple
+        if isinstance(img, tuple):
+            img = img[0]
+
+        if not isinstance(img, Image.Image):
+            st.write(f"Skipping invalid face type: {type(img)}")
+            continue
+
+        progress.progress(30 + int(60 * i / total),
+                          text=f"Identifying face {i+1} of {len(faces)}...")
+
         try:
             result = DeepFace.represent(
-                img_path=np.array(img),
+                img_path=img,  # ✅ חשוב מאוד - לא numpy
                 model_name="Facenet512",
                 detector_backend="retinaface",
                 enforce_detection=False
             )
+
+            # 🔥 הגנה: DeepFace מחזיר לפעמים tuple
+            if isinstance(result, tuple):
+                result = result[0]
+
+            # 🔥 הגנה: לפעמים זה לא list
+            if not isinstance(result, list) or len(result) == 0:
+                st.write("Invalid represent result:", result)
+                continue
+
+            if "embedding" not in result[0]:
+                st.write("Missing embedding:", result)
+                continue
+
             emb = np.array(result[0]["embedding"])
+
+            if emb is None or emb.size == 0:
+                continue
+
             emb = emb / np.linalg.norm(emb)
-        except Exception:
+
+        except Exception as e:
+            st.write("DEBUG represent error:", e)
             continue
 
         if not reference_embeddings:
@@ -548,57 +584,78 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
 
         avg_distances = {}
         for name, ref_embs in reference_embeddings.items():
-            avg_distances[name] = min([cosine_distance(emb, r) for r in ref_embs])
+            try:
+                dists = [cosine_distance(emb, r) for r in ref_embs]
+                if dists:
+                    avg_distances[name] = min(dists)
+            except Exception as e:
+                st.write(f"Distance error for {name}:", e)
 
         if not avg_distances:
             continue
 
         best_name, best_dist = min(avg_distances.items(), key=lambda x: x[1])
+
         if best_dist > threshold:
             best_name = None
 
         if best_name and best_name not in present_students:
             present_students[best_name] = {"img": img, "unknown": False}
-            recognized_faces.append({"name": best_name, "box": box, "dist": best_dist, "unknown": False})
+            recognized_faces.append({
+                "name": best_name,
+                "box": box,
+                "dist": best_dist,
+                "unknown": False
+            })
+
         elif best_name is None:
             unknown_key = f"Unknown_{i}"
             present_students[unknown_key] = {"img": img, "unknown": True}
-            recognized_faces.append({"name": "Unknown", "box": box, "dist": 1.0, "unknown": True})
+            recognized_faces.append({
+                "name": "Unknown",
+                "box": box,
+                "dist": 1.0,
+                "unknown": True
+            })
 
     progress.progress(100, text="Done!")
     progress.empty()
 
-    st.markdown(f'<p style="color:#b09080;font-size:13px;margin-bottom:1rem;">{len(faces)} faces detected</p>', unsafe_allow_html=True)
+    st.markdown(
+        f'<p style="color:#b09080;font-size:13px;margin-bottom:1rem;">{len(faces)} faces detected</p>',
+        unsafe_allow_html=True
+    )
 
+    # ציור תוצאות
     img_draw = Image.fromarray(original_img_rgb)
     draw = ImageDraw.Draw(img_draw)
-    font_name = font_conf = None
-    for path in ["/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
-                 "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf"]:
-        if os.path.exists(path):
-            font_name = ImageFont.truetype(path, 32)
-            font_conf = ImageFont.truetype(path, 20)
-            break
-    # ✅ תיקון: load_default ללא פרמטר size
-    if not font_name:
+
+    try:
+        font_name = ImageFont.truetype(
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 32)
+        font_conf = ImageFont.truetype(
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 20)
+    except:
         font_name = ImageFont.load_default()
         font_conf = ImageFont.load_default()
 
     for face in recognized_faces:
         x, y, w, h = face["box"]
+
         if face["unknown"]:
-            draw.rectangle([x, y, x+w, y+h], outline=(220,100,30), width=3)
-            draw.text((x, y-42), "Unknown", fill=(220,100,30), font=font_name)
+            draw.rectangle([x, y, x+w, y+h], outline=(220, 100, 30), width=3)
+            draw.text((x, y-42), "Unknown", fill=(220, 100, 30), font=font_name)
         else:
             pct = int((1 - face["dist"]) * 100)
-            draw.rectangle([x, y, x+w, y+h], outline=(201,149,102), width=3)
-            draw.text((x, y-42), face["name"], fill=(181,120,74), font=font_name)
-            draw.text((x, y-20), f"{pct}%", fill=(212,168,83), font=font_conf)
+            draw.rectangle([x, y, x+w, y+h], outline=(201, 149, 102), width=3)
+            draw.text((x, y-42), face["name"], fill=(181, 120, 74), font=font_name)
+            draw.text((x, y-20), f"{pct}%", fill=(212, 168, 83), font=font_conf)
 
     st.image(img_draw, use_column_width=True)
 
     known_present = {k: v for k, v in present_students.items() if not v["unknown"]}
     missing = [s for s in STUDENT_ROSTER if s not in known_present]
+
     attendance_pct = int(len(known_present) / max(len(STUDENT_ROSTER), 1) * 100)
     date_str = datetime.now().strftime("%Y-%m-%d %H:%M")
     updated_absences = update_absences(missing)
@@ -608,7 +665,6 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
         "missing": missing,
         "date": date_str
     }
-
     st.markdown(f"""
     <div class="stat-row">
         <div class="stat-card">
