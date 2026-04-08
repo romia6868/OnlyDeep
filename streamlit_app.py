@@ -582,7 +582,7 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
             result = DeepFace.represent(
                 img_path=np.array(img),
                 model_name="Facenet512",
-               detector_backend="opencv",
+                detector_backend="retinaface",
                 enforce_detection=False
             )
             emb = np.array(result[0]["embedding"])
@@ -590,13 +590,13 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
         except:
             continue
 
-       avg_distances = {}
+        avg_distances = {}
         for name, ref_embs in reference_embeddings.items():
             avg_distances[name] = min([cosine_distance(emb, r) for r in ref_embs])
 
         if not avg_distances:
-            st.error("Reference embeddings are empty! Cannot identify faces.")
-            return  # ← עוצר את הפונקציה בלי לקרוס
+            st.error("Reference embeddings are empty!")
+            return
 
         best_name, best_dist = min(avg_distances.items(), key=lambda x: x[1])
         if best_dist > threshold:
@@ -624,12 +624,10 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
             font_name = ImageFont.truetype(path, 32)
             font_conf = ImageFont.truetype(path, 20)
             break
-        try:
-            font_name = ImageFont.truetype("DejaVuSans-Bold.ttf", 32)
-            font_conf = ImageFont.truetype("DejaVuSans-Bold.ttf", 20)
-        except:
-            font_name = ImageFont.load_default()
-            font_conf = ImageFont.load_default()
+    if not font_name:
+        font_name = ImageFont.load_default(size=32)
+        font_conf = ImageFont.load_default(size=20)
+
     for face in recognized_faces:
         x, y, w, h = face["box"]
         if face["unknown"]:
@@ -647,7 +645,6 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
     missing = [s for s in STUDENT_ROSTER if s not in known_present]
     attendance_pct = int(len(known_present) / max(len(STUDENT_ROSTER), 1) * 100)
     date_str = datetime.now().strftime("%Y-%m-%d %H:%M")
-
     updated_absences = update_absences(missing)
 
     st.session_state.last_results = {
@@ -707,6 +704,7 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
         """, unsafe_allow_html=True)
 
     st.markdown('<div class="section-divider"><div class="divider-line"></div><span class="divider-badge badge-present"><span class="material-symbols-outlined">how_to_reg</span>Present</span><div class="divider-line"></div></div>', unsafe_allow_html=True)
+
     if present_students:
         cols = st.columns(5)
         for i, (name, data) in enumerate(present_students.items()):
@@ -721,6 +719,7 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
                     st.markdown(f'<div style="text-align:center;color:#7a9e6a;font-weight:600;font-size:13px;">{name}</div></div>', unsafe_allow_html=True)
 
     st.markdown('<div class="section-divider"><div class="divider-line"></div><span class="divider-badge badge-absent"><span class="material-symbols-outlined">person_off</span>Absent</span><div class="divider-line"></div></div>', unsafe_allow_html=True)
+
     if missing:
         cols = st.columns(5)
         for i, name in enumerate(missing):
