@@ -257,26 +257,20 @@ if "student_roster" not in st.session_state:
 
 STUDENT_ROSTER = st.session_state.student_roster
 
-st.cache_resource.clear()
-reference_embeddings = load_reference_embeddings()
 @st.cache_resource
 def load_reference_embeddings():
     embeddings = {}
-    
     if not os.path.exists(REFERENCE_DIR):
         st.error(f"REFERENCE_DIR not found: {REFERENCE_DIR}")
         return embeddings
-    
     students = os.listdir(REFERENCE_DIR)
     st.write(f"DEBUG: Found students folders: {students}")
-    
     for student in students:
         student_path = os.path.join(REFERENCE_DIR, student)
         if os.path.isdir(student_path):
             student_embeddings = []
             files = os.listdir(student_path)
             st.write(f"DEBUG: {student} has {len(files)} files")
-            
             for file in files:
                 if file.lower().endswith((".jpg",".jpeg",".png",".jfif")):
                     img_path = os.path.join(student_path, file)
@@ -292,13 +286,11 @@ def load_reference_embeddings():
                         student_embeddings.append(emb)
                     except Exception as e:
                         st.write(f"DEBUG: Failed on {student}/{file}: {e}")
-            
             if student_embeddings:
                 embeddings[student] = student_embeddings
                 st.write(f"DEBUG: ✓ {student} loaded with {len(student_embeddings)} embeddings")
             else:
                 st.write(f"DEBUG: ✗ {student} - no embeddings loaded!")
-    
     return embeddings
 
 @st.cache_resource
@@ -313,6 +305,9 @@ def load_reference_photos():
                 img_path = os.path.join(student_path, files[0])
                 photos[student] = Image.open(img_path).convert("RGB")
     return photos
+
+reference_embeddings = load_reference_embeddings()
+reference_photos = load_reference_photos()
 
 reference_embeddings = load_reference_embeddings()
 reference_photos = load_reference_photos()
