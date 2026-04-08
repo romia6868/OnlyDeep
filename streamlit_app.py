@@ -619,52 +619,39 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
         st.error(f"Invalid image type: {type(image_pil)}")
         return
 
-    scan_placeholder = st.empty()
-    scan_placeholder.markdown("""
-    <div class="scan-container">
-        <div class="scan-overlay"><div class="scan-line"></div></div>
-        <div style="background:#c9956615;border-radius:8px;padding:2rem;text-align:center;">
-            <span class="material-symbols-outlined" style="font-size:48px;color:#c99566;">document_scanner</span>
-            <p style="color:#b09080;margin-top:8px;font-size:14px;">Scanning photo...</p>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-
-    progress = st.progress(0, text="Detecting faces...")
-
-    # 🔹 קריאה לפונקציה שלך
     faces, original_img_rgb = extract_faces(image_pil, confidence_threshold)
 
-    progress.progress(30, text="Analyzing faces...")
-    scan_placeholder.empty()
-
-    # 🔴 הגנה קריטית
     if original_img_rgb is None:
         st.error("Image processing failed")
         return
 
     present_students = {}
     recognized_faces = []
-    total = max(len(faces), 1)
 
     for i, data in enumerate(faces):
         img = data["face"]
         box = data["box"]
 
+        # 🔥 הגנה קריטית (פה הייתה הבעיה שלך)
         if isinstance(img, tuple):
             img = img[0]
 
         if not isinstance(img, Image.Image):
             continue
 
-        progress.progress(
-            30 + int(60 * i / total),
-            text=f"Identifying face {i+1} of {len(faces)}..."
-        )
-
         try:
-            # 🔥 המרה ל-numpy (הפתרון ל-startswith error)
+            # 🔥 המרה בטוחה בלבד!
             img_np = np.array(img)
+
+            # 🔥 בדיקה שלא יצא tuple בטעות
+            if isinstance(img_np, tuple):
+                img_np = img_np[0]
+
+            if not hasattr(img_np, "shape"):
+                continue
+
+            if img_np.size == 0:
+                continue
 
             result = DeepFace.represent(
                 img_path=img_np,
@@ -673,7 +660,6 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
                 enforce_detection=False
             )
 
-            # 🔹 DeepFace לפעמים מחזיר tuple
             if isinstance(result, tuple):
                 result = result[0]
 
@@ -694,6 +680,7 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
             st.write("DEBUG represent error:", e)
             continue
 
+        # 🔴 אם אין embeddings → לעצור
         if not reference_embeddings:
             st.error("No reference embeddings loaded!")
             return
@@ -715,7 +702,7 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
         if best_dist > threshold:
             best_name = None
 
-        if best_name and best_name not in present_students:
+        if best_name:
             present_students[best_name] = {"img": img, "unknown": False}
             recognized_faces.append({
                 "name": best_name,
@@ -723,9 +710,7 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
                 "dist": best_dist,
                 "unknown": False
             })
-
-        elif best_name is None:
-            present_students[f"Unknown_{i}"] = {"img": img, "unknown": True}
+        else:
             recognized_faces.append({
                 "name": "Unknown",
                 "box": box,
@@ -733,17 +718,21 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
                 "unknown": True
             })
 
-    progress.progress(100, text="Done!")
-    progress.empty()
-
-    st.markdown(
-        f'<p style="color:#b09080;font-size:13px;margin-bottom:1rem;">{len(faces)} faces detected</p>',
-        unsafe_allow_html=True
-    )
-
-    # 🔴 עכשיו בטוח לא יקרוס
+    # 🔹 ציור תוצאה
     img_draw = Image.fromarray(original_img_rgb)
     draw = ImageDraw.Draw(img_draw)
+
+    for face in recognized_faces:
+        x, y, w, h = face["box"]
+
+        if face["unknown"]:
+            draw.rectangle([x, y, x+w, y+h], outline=(255, 0, 0), width=3)
+            draw.text((x, y-20), "Unknown", fill=(255, 0, 0))
+        else:
+            draw.rectangle([x, y, x+w, y+h], outline=(0, 255, 0), width=3)
+            draw.text((x, y-20), face["name"], fill=(0, 255, 0))
+
+    st.image(img_draw)
 
     try:
         font_name = ImageFont.truetype(
