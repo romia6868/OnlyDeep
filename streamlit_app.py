@@ -260,11 +260,22 @@ STUDENT_ROSTER = st.session_state.student_roster
 @st.cache_resource
 def load_reference_embeddings():
     embeddings = {}
-    for student in os.listdir(REFERENCE_DIR):
+    
+    if not os.path.exists(REFERENCE_DIR):
+        st.error(f"REFERENCE_DIR not found: {REFERENCE_DIR}")
+        return embeddings
+    
+    students = os.listdir(REFERENCE_DIR)
+    st.write(f"DEBUG: Found students folders: {students}")
+    
+    for student in students:
         student_path = os.path.join(REFERENCE_DIR, student)
         if os.path.isdir(student_path):
             student_embeddings = []
-            for file in os.listdir(student_path):
+            files = os.listdir(student_path)
+            st.write(f"DEBUG: {student} has {len(files)} files")
+            
+            for file in files:
                 if file.lower().endswith((".jpg",".jpeg",".png",".jfif")):
                     img_path = os.path.join(student_path, file)
                     try:
@@ -277,10 +288,15 @@ def load_reference_embeddings():
                         emb = np.array(result[0]["embedding"])
                         emb = emb / np.linalg.norm(emb)
                         student_embeddings.append(emb)
-                    except:
-                        pass
+                    except Exception as e:
+                        st.write(f"DEBUG: Failed on {student}/{file}: {e}")
+            
             if student_embeddings:
                 embeddings[student] = student_embeddings
+                st.write(f"DEBUG: ✓ {student} loaded with {len(student_embeddings)} embeddings")
+            else:
+                st.write(f"DEBUG: ✗ {student} - no embeddings loaded!")
+    
     return embeddings
 
 @st.cache_resource
@@ -572,9 +588,14 @@ def recognize_faces(image_pil, confidence_threshold=0.7, threshold=0.4):
         except:
             continue
 
-        avg_distances = {}
-        for name, ref_embs in reference_embeddings.items():
+       avg_distances = {}
+       for name, ref_embs in reference_embeddings.items():
             avg_distances[name] = min([cosine_distance(emb, r) for r in ref_embs])
+
+# ✅ בדיקה שיש בכלל עם מי להשוות
+        if not avg_distances:
+                st.warning("No reference embeddings loaded! Check REFERENCE_DIR.")
+                break
 
         best_name, best_dist = min(avg_distances.items(), key=lambda x: x[1])
         if best_dist > threshold:
