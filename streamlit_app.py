@@ -472,6 +472,7 @@ def extract_faces(image, confidence_threshold=0.7):
     if isinstance(image, tuple):
         image = image[0]
     img_rgb = np.array(image.convert("RGB"))
+    st.write(f"DEBUG img_rgb type: {type(img_rgb)}, shape: {img_rgb.shape}")
     faces = []
     try:
         face_objs = DeepFace.extract_faces(
