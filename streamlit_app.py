@@ -793,15 +793,22 @@ if st.session_state.mode == "upload":
         <div class="upload-sub">JPG · PNG · JPEG</div>
     </div>
     """, unsafe_allow_html=True)
-   class_file = st.file_uploader("Upload image", type=["jpg","jpeg","png"], label_visibility="collapsed")
+
+    class_file = st.file_uploader(
+        "Upload image",
+        type=["jpg","jpeg","png"],
+        label_visibility="collapsed"
+    )
+
     if class_file is not None:
         class_image = Image.open(class_file)
         class_image = ImageOps.exif_transpose(class_image)
+
         if max(class_image.size) > 1200:
             class_image.thumbnail((1200, 1200))
+
         if st.button("Scan for Attendance", key="scan_upload", type="primary"):
             recognize_faces(class_image, confidence, threshold)
-
 elif st.session_state.mode == "random":
     st.markdown('<p class="mode-desc">Generate a random class photo with students on a classroom background.</p>', unsafe_allow_html=True)
     if st.button("Generate Class Photo", key="gen_btn", type="primary"):
