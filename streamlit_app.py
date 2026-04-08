@@ -470,10 +470,11 @@ def generate_class_image():
 
 def extract_faces(image, confidence_threshold=0.7):
     import deepface
-    st.write(f"DEBUG deepface version: {deepface.__version__}")
+    st.write(f"DEBUG deepface location: {deepface.__file__}")
     st.write(f"DEBUG image type: {type(image)}")
     
     img_rgb = np.array(image.convert("RGB"))
+    ...
     faces = []
     try:
         face_objs = DeepFace.extract_faces(
